@@ -4,7 +4,7 @@
 2. Deploy the ERT 1.8 tile
    - enable TCP routing
 3. Follow [these instructions](https://docs.pivotal.io/pivotalcf/1-7/customizing/trouble-advanced.html) for accessing the BOSH director from the OpsMan VM.
-4. Upload the [custom stemcell](https://s3.amazonaws.com/dk-shared-assets/bosh-stemcell-3232.kernel-4.4-aws-xen-ubuntu-trusty-go_agent.tgz) to the BOSH director
+4. Upload a stemcell running Linux kernel 4.4 to the BOSH director.  Versions >= 3262.5 should work.
 5. Apply the neccessary changes to the deployment manifest (see below)
 6. Try deploying, see that certain releases ([netman-release](https://github.com/cloudfoundry-incubator/netman-release) and [garden-runc-release](http://bosh.io/releases/github.com/cloudfoundry-incubator/garden-runc-release?all=1)) are not found. Upload them: be sure to grab release versions matching those specified in your manfiest.
 7. Try deploying again should now see errors because certain releases are not compiled for the new stemcell (cf, diego, cflinuxfs...). Grab the releases from bosh.io and upload.  Be sure to get the right versions for your manifest.
