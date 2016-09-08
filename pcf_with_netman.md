@@ -56,16 +56,15 @@
 +    listen_network:
 +    log_level: debug
 +    network_mtu:
-+    network_plugin: "/var/vcap/packages/runc-cni/bin/guardian-cni-adapter"
++    network_plugin: "/var/vcap/packages/runc-cni/bin/garden-external-networker"
 +    network_plugin_extra_args:
 +    - "--configFile=/var/vcap/jobs/garden-cni/config/adapter.json"
 +    persistent_image_list:
 +    - "/var/vcap/packages/cflinuxfs2/rootfs"
 +  garden-cni:
-+    adapter:
-+      cni_config_dir: "/var/vcap/jobs/cni-flannel/config/cni"
-+      cni_plugin_dir: "/var/vcap/packages/flannel/bin"
-+      netman_url: http://127.0.0.1:4007
++    cni_config_dir: "/var/vcap/jobs/cni-flannel/config/cni"
++    cni_plugin_dir: "/var/vcap/packages/flannel/bin"
++    netman_url: http://127.0.0.1:4007
 ```
 
 
@@ -74,9 +73,9 @@
 -- name: garden-linux
 -  version: 0.339.0
 +- name: garden-runc
-+  version: 0.4.0
++  version: latest
 +- name: netman
-+  version: 0+dev.12
++  version: latest
 ```
 
 ```diff
@@ -86,7 +85,7 @@ stemcells:
    version: '3262.2'
 +- alias: bosh-aws-xen-ubuntu-trusty-go_agent
 +  os: ubuntu-trusty
-+  version: '3232.kernel-4.4'
++  version: '3262.5'
 ```
 
 ```diff
@@ -326,7 +325,11 @@ on every diego cell add the following jobs and update the stemcell:
 +    release: netman
 +    consumes: {}
 +    provides: {}
-+  - name: netman-agent
++  - name: vxlan-policy-agent
++    release: netman
++    consumes: {}
++    provides: {}
++  - name: netmon
 +    release: netman
 +    consumes: {}
 +    provides: {}
