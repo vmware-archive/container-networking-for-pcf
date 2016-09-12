@@ -31,8 +31,8 @@
 +        type: postgres
 +      skip_ssl_validation: true
 +      uaa_client_secret: REPLACE-policy-server-uaa-client-secret
-+      uaa_url: https://uaa.fez.c2c.cf-app.com
-+  system_domain: fez.c2c.cf-app.com
++      uaa_url: https://uaa.system.fez.c2c.cf-app.com
++  system_domain: system.fez.c2c.cf-app.com
 +  uaa:
 +    clients:
 +      network-policy:
@@ -40,7 +40,7 @@
 +  cni-flannel:
 +    etcd_endpoints:
 +    - http://netman-db.service.cf.internal:4001
-+  netman-agent:
++  vxlan-policy-agent:
 +    policy_server_url: http://policy-server.service.cf.internal:4002
 +  garden:
 +    allow_host_access:
