@@ -1,3 +1,13 @@
+## 1-Click PCF 1.8 Deploy on vSphere
+
+1. Navigate to the [Toolsmiths Environments App](http://environments.toolsmiths.cf-app.com/engineering_environments).
+2. Find a Resource Pool where the Status is "Available".
+3. Click the rocket image.
+4. Choose the `1.8-stable` PCF version.
+5. Choose `cf-container-networking@pivotal.io` from the team email list.
+6. Choose how long you want the environment for (ex: a week).
+7. Click Deploy.
+
 ## Deploying netman to PCF 1.8
 
 1. Deploy OpsMan 1.8
