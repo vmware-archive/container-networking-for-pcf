@@ -4,15 +4,16 @@
 2. Deploy the ERT 1.8 tile
    - enable TCP routing
 3. Follow [these instructions](https://docs.pivotal.io/pivotalcf/1-7/customizing/trouble-advanced.html) for accessing the BOSH director from the OpsMan VM.
-4. Upload a stemcell running Linux kernel 4.4 to the BOSH director.  Versions >= 3262.5 should work.
-5. Apply the neccessary changes to the deployment manifest (see below)
-6. Try deploying, see that certain releases ([netman-release](https://github.com/cloudfoundry-incubator/netman-release) and [garden-runc-release](http://bosh.io/releases/github.com/cloudfoundry-incubator/garden-runc-release?all=1)) are not found. Upload them: be sure to grab release versions matching those specified in your manfiest.
-7. Try deploying again should now see errors because certain releases are not compiled for the new stemcell (cf, diego, cflinuxfs...). Grab the releases from bosh.io and upload.  Be sure to get the right versions for your manifest.
-8. Deploy should succeed
+4. Apply the neccessary changes to the deployment manifest (see below)
+5. Upload any missing releases from bosh.io. Upload the versions of those releases specified in the deployment manifest. 
+6. Deploy should succeed
 
 ```diff
 +properties:
 +  policy-server:
++    ca_cert: REPLACE-policy-server-ca-cert
++    server_cert: REPLACE-policy-server-server-cert
++    server_key: REPLACE-policy-server-server-key
 +    database:
 +      databases:
 +      - name: policy_server
@@ -42,6 +43,9 @@
 +    - http://netman-db.service.cf.internal:4001
 +  vxlan-policy-agent:
 +    policy_server_url: http://policy-server.service.cf.internal:4002
++    ca_cert: REPLACE-vxlan-policy-agent-ca-cert
++    client_cert: REPLACE-vxlan-policy-agent-client-cert
++    client_key: REPLACE-vxlan-policy-agent-client-key
 +  garden:
 +    allow_host_access:
 +    allow_networks:
@@ -70,8 +74,6 @@
 
 ```diff
  releases:
--- name: garden-linux
--  version: 0.339.0
 +- name: garden-runc
 +  version: latest
 +- name: netman
@@ -90,65 +92,6 @@ stemcells:
 
 ```diff
  instance_groups:
-+- instances: 1
-+  name: policy-server-db
-+  vm_type: m3.medium
-+  lifecycle: service
-+  stemcell: bosh-aws-xen-hvm-ubuntu-trusty-go_agent
-+  azs:
-+  - us-west-2a
-+  properties:
-+    consul:
-+      encrypt_keys:
-+      - REPLACE-consul-encrypt-key
-+      ca_cert: |
-+        -----BEGIN CERTIFICATE-----
-        REPLACE-consul-ca-cert
-+        -----END CERTIFICATE-----
-+      agent_cert: |
-+        -----BEGIN CERTIFICATE-----
-        REPLACE-consul-agent-cert
-+        -----END CERTIFICATE-----
-+      agent_key: |
-+        -----BEGIN RSA PRIVATE KEY-----
-        REPLACE-consul-agent-key
-+        -----END RSA PRIVATE KEY-----
-+      server_cert: |
-+        -----BEGIN CERTIFICATE-----
-        REPLACE-consul-server-cert
-+        -----END CERTIFICATE-----
-+      server_key: |
-+        -----BEGIN RSA PRIVATE KEY-----
-        REPLACE-consul-server-key
-+        -----END RSA PRIVATE KEY-----
-+      agent:
-+        domain: cf.internal
-+        servers:
-+          lan:
-+          - 10.0.16.15
-+        services:
-+          policy-server-db:
-+            check:
-+              interval: 5s
-+              script: "/bin/true"
-+            name: policy-server-db
-+  templates:
-+  - name: postgres
-+    release: netman
-+  - name: consul_agent
-+    release: cf
-+  env:
-+    bosh:
-+      password: "REPLACE-env-bosh-passowrd"
-+  update:
-+    serial: true
-+    max_in_flight: 1
-+  networks:
-+  - name: REPLACE-network-name
-+    default:
-+    - dns
-+    - gateway
-+  persistent_disk_type: '1024'
 +- instances: 1
 +  name: policy-server
 +  vm_type: m3.medium
@@ -218,7 +161,7 @@ stemcells:
 +    serial: true
 +    max_in_flight: 1
 +  networks:
-+  - name: auniquenameforthisnetwork
++  - name: REPLACE-network-name
 +    default:
 +    - dns
 +    - gateway
@@ -281,13 +224,12 @@ stemcells:
 +    serial: true
 +    max_in_flight: 1
 +  networks:
-+  - name: REPLACE-your-network-name
++  - name: REPLACE-network-name
 +    default:
 +    - dns
 +    - gateway
 +  persistent_disk_type: '1024'
 ```
-
 
 in uaa instance_group properties.clients:
 ```diff
@@ -312,8 +254,6 @@ in uaa instance_group properties.scim:
           groups:
 +        - network.admin
 ```
-
-replace all instances of `garden-linux` with `garden-runc`
 
 on every diego cell add the following jobs and update the stemcell:
 ```diff
