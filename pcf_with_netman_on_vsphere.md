@@ -7,6 +7,26 @@
 5. Choose `cf-container-networking@pivotal.io` from the team email list.
 6. Choose how long you want the environment for (ex: a week).
 7. Click Deploy.
+8. Click the icon to download the environment manifest.
+9. Navigate to the Ops Manager interface. You can find the fully qualified domain domain
+(FQDN) in the manifest under `ops_manager.url`.
+10. In the Installation Dashboard should be the Ops Manager Director for vSphere tile.
+On the right side, click `INSTALL`. (This will take about a half hour...)
+11. Magically, the Pivotal Elastic Runtime tile will show up in the Installation Dashboard.
+`INSTALL` this too. (This will take about an hour...)
+
+## Using the BOSH CLI to upload releases
+1. In the downloaded environment manifest, use the `vm_password` field to ssh onto the
+Ops Manager VM with: `ssh ubunut@pcf.ENVIRONMENT.cf-app.com`.
+- Note: if you will require your SSH key on the VM, use the `-A` flag to forward your SSH agent.
+2. From the Ops Manager interface, navigate to the Status tab and copy the Director IP address.
+3. From the Ops Manager interface, navigate to the Credentials tab, click `Link to Credential` for th `Director Credentials` and copy the json.
+4. Run `uaac target --ca-cert /var/tempest/worksapces/default/root_ca_certificate https://DIRECTOR_IP:8443`.
+5. Run `bosh target DIRECTOR_IP`
+6. Log into the BOSH Director with `bosh --ca-cert /var/tempest/workspaces/default/root_ca_certificate target DIRECTOR_IP ENVIRONMENT_NAME`
+ - You will be prompted to enter the Director Credentials. (Email can be filled with the `identity` value.)
+7. Run `bosh upload release https://bosh.io/d/github.com/cloudfoundry-incubator/netman-release`.
+
 
 ## Deployment manifest edits for PCF 1.8 on vSphere
 
