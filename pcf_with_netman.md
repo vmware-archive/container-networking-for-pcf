@@ -1,152 +1,112 @@
-## Deploying netman to PCF 1.8
+# Deploying netman to PCF 1.8
 
+## Prerequisites
+You have an OpsManager and Elastic Runtime Tile 1.8 deployed.  You know how
+to SSH to the OpsMan VM and run BOSH commands against the BOSH director.
+
+## Steps
 1. Deploy OpsMan 1.8
 2. Deploy the ERT 1.8 tile
    - enable TCP routing
 3. Follow [these instructions](https://docs.pivotal.io/pivotalcf/1-7/customizing/trouble-advanced.html) for accessing the BOSH director from the OpsMan VM.
 4. Apply the neccessary changes to the deployment manifest (see below)
-5. Upload any missing releases from bosh.io. Upload the versions of those releases specified in the deployment manifest. 
+5. Upload [netman release](http://bosh.io/releases/github.com/cloudfoundry-incubator/netman-release?all=1)
 6. Deploy should succeed
 
-```diff
-+properties:
-+  policy-server:
-+    ca_cert: REPLACE-policy-server-ca-cert
-+    server_cert: REPLACE-policy-server-server-cert
-+    server_key: REPLACE-policy-server-server-key
-+    database:
-+      databases:
-+      - name: policy_server
-+        tag: whatever
-+      db_scheme: postgres
-+      port: 5432
-+      roles:
-+      - name: policy_server
-+        password: REPLACE-policy-server-db-password
-+        tag: admin
-+    database_password: REPLACE-policy-server-db-password
-+    server:
-+      database:
-+        host: policy-server-db.service.cf.internal
-+        password: REPLACE-policy-server-db-password
-+        type: postgres
-+      skip_ssl_validation: true
-+      uaa_client_secret: REPLACE-policy-server-uaa-client-secret
-+      uaa_url: https://uaa.system.fez.c2c.cf-app.com
-+  system_domain: system.fez.c2c.cf-app.com
-+  uaa:
-+    clients:
-+      network-policy:
-+        secret: REPLACE-policy-server-uaa-client-secret
-+  cni-flannel:
-+    etcd_endpoints:
-+    - http://netman-db.service.cf.internal:4001
-+  vxlan-policy-agent:
-+    policy_server_url: http://policy-server.service.cf.internal:4002
-+    ca_cert: REPLACE-vxlan-policy-agent-ca-cert
-+    client_cert: REPLACE-vxlan-policy-agent-client-cert
-+    client_key: REPLACE-vxlan-policy-agent-client-key
-+  garden:
-+    allow_host_access:
-+    allow_networks:
-+    default_container_grace_time: 0
-+    deny_networks:
-+    - 0.0.0.0/0
-+    destroy_containers_on_start: true
-+    disk_quota_enabled:
-+    graph_cleanup_threshold_in_mb: 0
-+    insecure_docker_registry_list:
-+    listen_address:
-+    listen_network:
-+    log_level: debug
-+    network_mtu:
-+    network_plugin: "/var/vcap/packages/runc-cni/bin/garden-external-networker"
-+    network_plugin_extra_args:
-+    - "--configFile=/var/vcap/jobs/garden-cni/config/adapter.json"
-+    persistent_image_list:
-+    - "/var/vcap/packages/cflinuxfs2/rootfs"
-+  garden-cni:
-+    cni_config_dir: "/var/vcap/jobs/cni-flannel/config/cni"
-+    cni_plugin_dir: "/var/vcap/packages/flannel/bin"
-+    netman_url: http://127.0.0.1:4007
-```
+## Deployment manifest changes
 
-
+### Releases
 ```diff
- releases:
-+- name: garden-runc
-+  version: latest
 +- name: netman
 +  version: latest
 ```
 
+### Instance Groups
+In `mysql.properties.cf_mysql.mysql.seeded_databases:` add a new database:
 ```diff
-stemcells:
- - alias: bosh-aws-xen-hvm-ubuntu-trusty-go_agent
-   os: ubuntu-trusty
-   version: '3262.2'
-+- alias: bosh-aws-xen-ubuntu-trusty-go_agent
-+  os: ubuntu-trusty
-+  version: '3262.5'
++        - name: policy_server
++          username: policy_server
++          password: DATABASE_PASSWORD
 ```
 
+In `uaa.properties.uaa.clients.cf`, modify the list of `scopes` to include `network.admin`:
 ```diff
- instance_groups:
+-          scope: cloud_controller.read,cloud_controller.write,openid,password.write,cloud_controller.admin,scim.read,scim.write,doppler.firehose,uaa.user,routing.router_groups.read,routing.router_groups.write
++          scope: cloud_controller.read,cloud_controller.write,openid,password.write,cloud_controller.admin,scim.read,scim.write,doppler.firehose,uaa.user,routing.router_groups.read,routing.router_groups.write,network.admin
+```
+
+In `uaa.properties.uaa.clients`, add a new client called `network-policy`:
+```diff
++        network-policy:
++          authorities: uaa.resource
++          secret: NETWORK_POLICY_SERVER_UAA_CLIENT_SECRET
+```
+
+
+In `uaa.properties.uaa.scim.users`, modify the `admin` user to belong to a new group called `network.admin`:
+```diff
+           - console.admin
+           - console.support
+           - doppler.firehose
++          - network.admin
+           - notification_preferences.read
+           - notification_preferences.write
+           - notifications.manage
+```
+
+Add a new instance group called `policy-server` which includes the `consul` job with the standard `consul` encryption key and certificates.
+
+```diff
 +- instances: 1
 +  name: policy-server
-+  vm_type: m3.medium
++  vm_type: medium.mem
 +  lifecycle: service
-+  stemcell: bosh-aws-xen-hvm-ubuntu-trusty-go_agent
++  stemcell: bosh-vsphere-esxi-ubuntu-trusty-go_agent
 +  azs:
-+  - us-west-2a
++  - default
 +  properties:
 +    consul:
 +      encrypt_keys:
-+      - REPLACE-consul-encrypt-key
-+      ca_cert: |
-+        -----BEGIN CERTIFICATE-----
-        REPLACE-consul-ca-cert
-+        -----END CERTIFICATE-----
-+      agent_cert: |
-+        -----BEGIN CERTIFICATE-----
-        REPLACE-consul-agent-cert
-+        -----END CERTIFICATE-----
-+      agent_key: |
-+        -----BEGIN RSA PRIVATE KEY-----
-        REPLACE-consul-agent-key
-+        -----END RSA PRIVATE KEY-----
-+      server_cert: |
-+        -----BEGIN CERTIFICATE-----
-        REPLACE-consul-server-cert
-+        -----END CERTIFICATE-----
-+      server_key: |
-+        -----BEGIN RSA PRIVATE KEY-----
-        REPLACE-consul-server-key
-+        -----END RSA PRIVATE KEY-----
++      - CONSUL_ENCRYPT_KEY
++      ca_cert: CONSUL_CA_CERT
++      agent_cert: CONSUL_AGENT_CERT
++      agent_key: CONSUL_AGENT_KEY
++      server_cert: CONSUL_SERVER_CERT
++      server_key: CONSUL_SERVER_KEY
 +      agent:
 +        domain: cf.internal
-+        servers:
-+          lan:
-+          - 10.0.16.15
 +        services:
 +          policy-server:
 +            check:
 +              interval: 5s
 +              script: "/bin/true"
 +            name: policy-server
++        servers:
++          lan:
++          - CONSUL_LAN_IP
 +    nats:
-+      user: nats
-+      password: REPLACE-nats-password
++      user: NATS_USERNAME
++      password: NATS_PASSWORD
 +      port: 4222
 +      machines:
-+      - 10.0.16.16
++      - NATS_IP
 +    route_registrar:
 +      routes:
 +      - name: policy-server
 +        port: 4002
 +        registration_interval: 20s
 +        uris:
-+        - api.fez.c2c.cf-app.com/networking
++        - api.SYSTEM_DOMAIN/networking
++    policy-server:
++      ca_cert: POLICY_SERVER_CA_CERT
++      server_cert: POLICY_SERVER_SERVER_CERT
++      server_key: POLICY_SERVER_SERVER_KEY
++      database:
++        connection_string: policy_server:DATABASE_PASSWORD@tcp(MYSQL_PROXY_IP:3306)/policy_server
++        type: mysql
++      skip_ssl_validation: true
++      uaa_client_secret: NETWORK_POLICY_SERVER_UAA_CLIENT_SECRET
++      uaa_url: https://uaa.SYSTEM_DOMAIN
 +  templates:
 +  - name: policy-server
 +    release: netman
@@ -156,127 +116,69 @@ stemcells:
 +    release: cf
 +  env:
 +    bosh:
-+      password: "REPLACE-env-bosh-passowrd"
++      password: ENV_BOSH_PASSWORD
 +  update:
 +    serial: true
 +    max_in_flight: 1
 +  networks:
-+  - name: REPLACE-network-name
-+    default:
-+    - dns
-+    - gateway
-+  persistent_disk_type: '1024'
-+- instances: 1
-+  name: flannel_etcd
-+  azs:
-+  - us-west-2a
-+  vm_type: m3.medium
-+  stemcell: bosh-aws-xen-hvm-ubuntu-trusty-go_agent
-+  properties:
-+    consul:
-+      encrypt_keys:
-+      - REPLACE-consul-encrypt-key
-+      ca_cert: |
-+        -----BEGIN CERTIFICATE-----
-        REPLACE-consul-ca-cert
-+        -----END CERTIFICATE-----
-+      agent_cert: |
-+        -----BEGIN CERTIFICATE-----
-        REPLACE-consul-agent-cert
-+        -----END CERTIFICATE-----
-+      agent_key: |
-+        -----BEGIN RSA PRIVATE KEY-----
-        REPLACE-consul-agent-key
-+        -----END RSA PRIVATE KEY-----
-+      server_cert: |
-+        -----BEGIN CERTIFICATE-----
-        REPLACE-consul-server-cert
-+        -----END CERTIFICATE-----
-+      server_key: |
-+        -----BEGIN RSA PRIVATE KEY-----
-        REPLACE-consul-server-key
-+        -----END RSA PRIVATE KEY-----
-+      agent:
-+        domain: cf.internal
-+        servers:
-+          lan:
-+          - 10.0.16.15
-+        services:
-+          netman-db:
-+            check:
-+              interval: 5s
-+              script: "/bin/true"
-+            name: netman-db
-+    etcd:
-+      machines:
-+      - netman-db.service.cf.internal
-+      peer_require_ssl: false
-+      require_ssl: false
-+  templates:
-+  - name: consul_agent
-+    release: cf
-+  - name: etcd
-+    release: etcd
-+  env:
-+    bosh:
-+      password: "REPLACE- the right password for env bosh??"
-+  update:
-+    serial: true
-+    max_in_flight: 1
-+  networks:
-+  - name: REPLACE-network-name
++  - name: default
 +    default:
 +    - dns
 +    - gateway
 +  persistent_disk_type: '1024'
 ```
 
-in uaa instance_group properties.clients:
-```diff
-         cf:
-           id: cf
-           override: true
-           authorities: uaa.none
-           authorized-grant-types: password,refresh_token
--          scope: cloud_controller.read,cloud_controller.write,openid,password.write,cloud_controller.admin,scim.read,scim.write,doppler.firehose,uaa.user,routing.router_groups.read
-+          scope: cloud_controller.read,cloud_controller.write,openid,password.write,cloud_controller.admin,scim.read,scim.write,doppler.firehose,uaa.user,routing.router_groups.read,network.admin
-           access-token-validity: 7200
-           refresh-token-validity: 1209600
-+        network-policy:
-+          authorities: uaa.resource
-+          secret: REPLACE-for-network-policy-client
-```
+In the `diego_cell` instance group...
 
-in uaa instance_group properties.scim:
-```diff
-        users:
-        - name: admin
-          groups:
-+        - network.admin
-```
+1. Add these jobs:
 
-on every diego cell add the following jobs and update the stemcell:
-```diff
-+  - name: garden-cni
-+    release: netman
-+    consumes: {}
-+    provides: {}
-+  - name: cni-flannel
-+    release: netman
-+    consumes: {}
-+    provides: {}
-+  - name: vxlan-policy-agent
-+    release: netman
-+    consumes: {}
-+    provides: {}
-+  - name: netmon
-+    release: netman
-+    consumes: {}
-+    provides: {}
-   vm_type: m3.2xlarge
--  stemcell: bosh-aws-xen-hvm-ubuntu-trusty-go_agent
-+  stemcell: bosh-aws-xen-ubuntu-trusty-go_agent
-   properties:
-     diego:
-       executor:
-```
+  ```diff
+  +  - name: garden-cni
+  +    release: netman
+  +    consumes: {}
+  +    provides: {}
+  +  - name: cni-flannel
+  +    release: netman
+  +    consumes: {}
+  +    provides: {}
+  +  - name: vxlan-policy-agent
+  +    release: netman
+  +    consumes: {}
+  +    provides: {}
+  +  - name: netmon
+  +    release: netman
+  +    consumes: {}
+  +    provides: {}
+  ```
+
+2. Edit `properties.garden` to include:
+
+  ```diff
+  +      network_plugin: "/var/vcap/packages/runc-cni/bin/garden-external-networker"
+  +      network_plugin_extra_args:
+  +      - "--configFile=/var/vcap/jobs/garden-cni/config/adapter.json"
+  ```
+
+3. Add to `properties`
+  ```diff
+  +    cni-flannel:
+  +      etcd_ca_cert:
+  +      etcd_client_cert:
+  +      etcd_client_key:
+  +      etcd_endpoints:
+  +      - ETCD_IP
+  +      flannel:
+  +        etcd:
+  +          require_ssl: false
+  +    vxlan-policy-agent:
+  +      policy_server_url: https://policy-server.service.cf.internal:4003
+  +      ca_cert: VXLAN_POLICY_AGENT_CA_CERT
+  +      client_cert: VXLAN_POLICY_AGENT_CLIENT_CERT
+  +      client_key: VXLAN_POLICY_AGENT_CLIENT_KEY
+  +    garden-cni:
+  +      cni_config_dir: "/var/vcap/jobs/cni-flannel/config/cni"
+  +      cni_plugin_dir: "/var/vcap/packages/flannel/bin"
+  ```
+
+  NOTE: The client certificate and key that the `vxlan-policy-agent` presents to the `policy-server` must be generated from the same `ca_cert` that is used to generate the server certificate and key for the `policy-server`.
+  There is a [script in netman-release](https://github.com/cloudfoundry-incubator/netman-release/blob/develop/scripts/generate-certs) to generate certs/keys for this.
