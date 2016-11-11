@@ -1,19 +1,28 @@
-# Deploying netman to PCF 1.8
+# Deploying netman to Pivotal Cloud Foundry
 
-## Prerequisites
-You have an OpsManager and Elastic Runtime Tile 1.8 deployed.  You know how
-to SSH to the OpsMan VM and run BOSH commands against the BOSH director.
+## Pre-requisites
+This document assumes that you are familiar with Ops Manager and Elastic Runtime. You know how to SSH to the OpsMan VM and run BOSH commands against the BOSH director.
 
-## Steps
-1. Deploy OpsMan 1.8
-2. Deploy the ERT 1.8 tile
-   - enable TCP routing
-3. Follow [these instructions](https://docs.pivotal.io/pivotalcf/1-7/customizing/trouble-advanced.html) for accessing the BOSH director from the OpsMan VM.
-4. Apply the neccessary changes to the deployment manifest (see below)
-5. Upload [netman release](http://bosh.io/releases/github.com/cloudfoundry-incubator/netman-release?all=1)
-6. Deploy should succeed
+These instructions work best on a greenfield deployment using the versions that have been validated. When applied to an existing environment, you will need to `recreate` your cells for container networking policies to be applied to existing apps, and may need to upgrade `cf-release` and `diego-release` to match those specified in netman [release-notes](https://github.com/cloudfoundry-incubator/netman-release/releases). 
 
-## Deployment manifest changes
+## Tested Versions
+- Ops Manager : v1.8.9.0
+- Elastic Runtime : v1.8.11
+- netman-release : v0.5.0
+
+## Step 1 - Deploy Ops Manager and ERT
+Follow Pivotal [documentation](https://docs.pivotal.io/pivotalcf/1-8/installing/) to install Ops Manager, the BOSH director and Elastic Runtime. 
+
+## Step 2 - Access BOSH director
+Follow [these instructions](https://docs.pivotal.io/pivotalcf/1-7/customizing/trouble-advanced.html) for accessing the BOSH director from the OpsMan VM.
+
+## Step 3 - Upload netman release
+From the BOSH Director command line, follow the insturctions on [bosh.io](http://bosh.io/releases/github.com/cloudfoundry-incubator/netman-release?all=1) to upload netman release.
+
+## Step 4 - Edit deployment manifest
+Run `bosh deployments` to get a list of deployments. The CF deployment is prefixed with `cf-`. For example, in our setup it is `cf-0caa8053ec39e45fcd72`
+
+The deployment manifest can be found under `/var/tempest/workspaces/default/deployments/` and will have the same name as the manifest. In our example the file is `cf-0caa8053ec39e45fcd72.yml`. Use your favorite CLI editor to change the following items in the manifest: 
 
 ### Releases
 ```diff
@@ -182,3 +191,14 @@ In the `diego_cell` instance group...
 
   NOTE: The client certificate and key that the `vxlan-policy-agent` presents to the `policy-server` must be generated from the same `ca_cert` that is used to generate the server certificate and key for the `policy-server`.
   There is a [script in netman-release](https://github.com/cloudfoundry-incubator/netman-release/blob/develop/scripts/generate-certs) to generate certs/keys for this.
+
+## Step 5 - Re-deploy Elastic Runtime
+Set the BOSH deployment to the edited manifest and deploy. For example:
+```
+bosh deployment cf-0caa8053ec39e45fcd72.yml
+bosh deploy
+```
+For a brownfield deployment provide the `--recreate` option while deploying to recreate the Diego cells. 
+
+## Step 6 - Try container networking
+If the deployment succeeds, validate container networking is working by trying the [Cats & Dogs](https://github.com/cloudfoundry-incubator/netman-release/blob/develop/src/example-apps/cats-and-dogs) example.
