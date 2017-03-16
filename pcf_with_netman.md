@@ -1,3 +1,4 @@
+# DEPRECATED: Please follow [Pivotal documentation](http://docs.pivotal.io/pivotalcf/1-10/devguide/deploy-apps/cf-networking.html) to enable container networking 
 # Deploying netman to Pivotal Cloud Foundry
 
 ## Pre-requisites
